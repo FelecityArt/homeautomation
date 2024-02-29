@@ -32,8 +32,8 @@ class DB:
         self.ObjectId                       = ObjectId 
         self.server			                = Config.DB_SERVER
         self.port			                = Config.DB_PORT
-        self.username                   	= parse.quote_plus(Config.DB_USERNAME)
-        self.password                   	= parse.quote_plus(Config.DB_PASSWORD)
+        self.username                   	= parse.quote_plus(str(Config.DB_USERNAME))
+        self.password                   	= parse.quote_plus(str(Config.DB_PASSWORD))
         self.remoteMongo                	= MongoClient
         self.ReturnDocument                 = ReturnDocument
         self.PyMongoError               	= errors.PyMongoError
@@ -53,8 +53,77 @@ class DB:
     
     # 1. CREATE FUNCTION TO INSERT DATA IN TO THE RADAR COLLECTION
 
-    
+    def update_or_insert(self, data):
+        try:
+            remotedb = self.remoteMongo('mongodb://%s:%s@%s:%s' % (self.username, self.password,self.server,self.port), tls=self.tls)
+            result  = remotedb.ELET2415.code.update_one({'type':'passcode'}, {"$set": {'code':data}})
+            return result
+        except Exception as e:
+            print(e)
+            return "Failed"
     # 2. CREATE FUNCTION TO RETRIEVE ALL DOCUMENTS FROM RADAR COLLECT BETWEEN SPECIFIED DATE RANGE. MUST RETURN A LIST OF DOCUMENTS
+
+    def validate(self,password):
+        try: 
+            remotedb = self.remoteMongo('mongodb://%s:%s@%s:%s' % (self.username, self.password,self.server,self.port), tls=self.tls)
+            result = remotedb.ELET2415.code.count_documents({'code':password})
+            return result
+        except Exception as e:
+            print(e)
+            return "Failed"
+        
+    def update(self,document):
+        try:
+            remotedb = self.remoteMongo('mongodb://%s:%s@%s:%s' % (self.username, self.password,self.server,self.port), tls=self.tls)
+            result = remotedb.ELET2415.radar.insert_one(document)
+            print(result.inserted_id)
+            return result
+        except Exception as e:
+            print(e)
+            return "Failed"
+    
+    def get_reserve(self,start,end):
+        try:
+            remotedb = self.remoteMongo('mongodb://%s:%s@%s:%s' % (self.username, self.password,self.server,self.port), tls=self.tls)
+            query = {'timestamp': {'$gte':start,'$lte':end}}
+            projection = {'timestamp':0,'_id':0}
+            result = remotedb.ELET2415.radar.find(query,projection)
+            return result
+        except Exception as e:
+            print(e)
+            return 'Failed'
+
+            
+            
+    def get_avg(self,start,end):
+        try:
+            remotedb = self.remoteMongo('mongodb://%s:%s@%s:%s' % (self.username, self.password,self.server,self.port), tls=self.tls)
+            query = {'timestamp': {'$gte':start,'$lte':end}}
+            result = remotedb.ELET2415.radar.aggregate([
+    {
+        '$match': {
+            'timestamp': {
+                '$gte': start, 
+                '$lte': end
+            }
+        }
+    }, {
+        '$group': {
+            '_id': None, 
+            'average': {
+                '$avg': '$reserve'
+            }
+        }
+    }, {
+        '$project': {
+            '_id': 0
+        }
+    }
+])
+            return result
+        except Exception as e:
+            print(e)
+            return 'Failed'
 
 
     # 3. CREATE A FUNCTION TO COMPUTE THE ARITHMETIC AVERAGE ON THE 'reserve' FEILED/VARIABLE, USING ALL DOCUMENTS FOUND BETWEEN SPECIFIED START AND END TIMESTAMPS. RETURNS A LIST WITH A SINGLE OBJECT INSIDE
@@ -65,7 +134,8 @@ class DB:
     
     # 5. CREATE A FUNCTION THAT RETURNS A COUNT, OF THE NUMBER OF DOCUMENTS FOUND IN THE 'code' COLLECTION WHERE THE 'code' FEILD EQUALS TO THE PROVIDED PASSCODE.
     #    REMEMBER, THE SCHEMA FOR THE SINGLE DOCUMENT IN THE 'code' COLLECTION IS {"type":"passcode","code":"0070"}
-
+            
+        
 
    
 
@@ -85,6 +155,3 @@ def main():
     
 if __name__ == '__main__':
     main()
-
-
-    
